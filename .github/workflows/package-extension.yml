@@ -1,0 +1,33 @@
+name: Package VS Code Extension
+
+on:
+  push:
+    branches:
+      - main
+      - nimrossum/devcontainer
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install vsce
+        run: npm install -g @vscode/vsce
+
+      - name: Package extension
+        working-directory: extensions/trench-highlighting
+        run: vsce package --no-dependencies
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: trench-highlighting-vsix
+          path: extensions/trench-highlighting/*.vsix
