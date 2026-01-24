@@ -9,6 +9,7 @@
 #include "util.h"
 #include "color.h"
 #include "log.h"
+#include "sound.h"
 
 // https://stackoverflow.com/questions/26423537/how-to-position-the-input-text-cursor-in-c
 inline void clear_screen(void) {
@@ -78,7 +79,7 @@ const char* symbol_lookup[] = {
     "\u2058",
     "\u2059",
     "\u2612",
-    "A", // "\u26f0" 
+    "A", // "\u26f0"
 };
 
 
@@ -146,7 +147,7 @@ void buffer(char* format, ...) {
             return;
         }
         int new_size = 2 * view_buf_size;
-        if (new_size > view_buf_max_size) 
+        if (new_size > view_buf_max_size)
             new_size = view_buf_max_size;
 
         _log(INFO, "Increasing view buffer to: %i", new_size);
@@ -189,7 +190,7 @@ void print_board() {
     int feed_index = 0;
 
     if (view_buf == NULL) {
-        view_buf_max_size = 
+        view_buf_max_size =
             _gr->viewport.width + // First line
             _gr->viewport.height + // Newlines
             (2 * _gr->viewport.height + 2 * _gr->viewport.width) + // Border
@@ -227,10 +228,10 @@ void print_board() {
 
             if (mod_changed || !color_eq(visual.foreground_color, prev_visual.foreground_color))
                 set_color(visual.foreground_color, FORE);
-            
+
             if (mod_changed || !color_eq(visual.background_color, prev_visual.background_color))
                 set_color(visual.background_color, BACK);
-            
+
             buffer("%s", visual.symbol);
             prev_visual = visual;
         }
@@ -257,4 +258,5 @@ void print_board() {
     puts(view_buf);
 
     clear_feed();
+    sound_flush();
 }

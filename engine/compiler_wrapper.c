@@ -22,7 +22,7 @@ field_state* create_board(char* map_data, const int x, const int y) {
     int size = sizeof(field_state)*x*y;
     field_state* brd = malloc(size);
 
-    for (int _x = 0; _x < x; _x++) 
+    for (int _x = 0; _x < x; _x++)
     for (int _y = 0; _y < y; _y++) {
         brd[(_y * x) + _x] = (field_state) {
             .overlays = 0,
@@ -62,7 +62,7 @@ field_state* create_board(char* map_data, const int x, const int y) {
                 brd[(_y * x) + _x].type = OCEAN;
                 add_event(brd[(_y * x) + _x].enter_events, FIELD_EVENT, events.ocean_drowning, NULL);
                 break;
-            case 'T': 
+            case 'T':
                 brd[(_y * x) + _x].type = TREE;
                 break;
             case 'C':
@@ -109,12 +109,12 @@ int compile_player(const char* path, int stack_size, int size_limit, directive_i
     static const value* compile_player_closure = NULL;
     if(compile_player_closure == NULL) compile_player_closure = caml_named_value("compile_player_file");
     value callback_result = caml_callback2(*compile_player_closure, caml_copy_string(path), Val_int(size_limit));
-    
+
     switch (Tag_val(callback_result)) {
         case 0: { // Ok
             value comp = Field(callback_result, 0);
             *result = load_directive_to_struct(comp, stack_size);
-            return 1; 
+            return 1;
         }
         case 1: { // Error
             printf("%s", String_val(Field(callback_result, 0)));
@@ -284,7 +284,7 @@ int compile_game(const char* path, game_rules* gr, game_state* gs) {
         case 0: { // Ok
 
             value unwrapped_result = Field(callback_result, 0);
-            
+
             int seed;
             if (Is_some(Field(unwrapped_result, 11)) ) {
                 seed = Int_val(Some_val(Field(unwrapped_result, 11)));
@@ -296,7 +296,7 @@ int compile_game(const char* path, game_rules* gr, game_state* gs) {
                 srand(seed);
             }
 
-            _log(INFO, "seed: %i", seed);            
+            _log(INFO, "seed: %i", seed);
 
             *gr = (game_rules) {
                 .actions = Int_val(Field(unwrapped_result, 0)),
@@ -357,6 +357,7 @@ int compile_game(const char* path, game_rules* gr, game_state* gs) {
                 .team_count = team_count,
                 .team_states = malloc(sizeof(team_state) * team_count),
                 .events = array_list.create(10),
+                .sound_events = array_list.create(8),
             };
 
             // Center board in viewport;
@@ -367,7 +368,7 @@ int compile_game(const char* path, game_rules* gr, game_state* gs) {
                 value team_info = Field(Field(unwrapped_result, 8),i);
                 gs->team_states[i].team_name = strdup(String_val(Field(team_info, 0)));
                 gs->team_states[i].color = malloc(sizeof(color));
-                *gs->team_states[i].color = (color) { 
+                *gs->team_states[i].color = (color) {
                     .r = (Int_val(Field(Field(team_info, 1), 0))),
                     .g = (Int_val(Field(Field(team_info, 1), 1))),
                     .b = (Int_val(Field(Field(team_info, 1), 2))),
@@ -379,7 +380,7 @@ int compile_game(const char* path, game_rules* gr, game_state* gs) {
 
             for(int i = 0; i < player_count; i++) {
                 value player_info = Field(Field(unwrapped_result, 6),i);
-                
+
                 player_state* player = malloc(sizeof(player_state));
                 int player_x = Int_val(Field(Field(player_info, 2), 0));
                 int player_y = Int_val(Field(Field(player_info, 2), 1));

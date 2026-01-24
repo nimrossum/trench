@@ -9,19 +9,20 @@
 #include "util.h"
 #include "visual.h"
 #include "log.h"
+#include "sound.h"
 
-game_state* _gs = NULL; 
+game_state* _gs = NULL;
 game_rules* _gr = NULL;
 
 
 void set_color_overlay(field_state* field, color_target ct, color_predef c) {
     switch (ct) {
-        case FORE: 
-            field->foreground_color = c; 
+        case FORE:
+            field->foreground_color = c;
             field->overlays |= FOREGROUND_COLOR_OVERLAY;
             break;
-        case BACK: 
-            field->background_color = c; 
+        case BACK:
+            field->background_color = c;
             field->overlays |= BACKGROUND_COLOR_OVERLAY;
             break;
     }
@@ -57,10 +58,16 @@ void kill_player(player_state* ps) {
     field_state* field = location_field(ps->location);
     field->symbol = COFFIN;
     field->foreground_color = WHITE;
-    
+
+    int x = SOUND_POS_UNKNOWN;
+    int y = SOUND_POS_UNKNOWN;
+    if (ps->location.type != VOID_LOCATION)
+        location_coords(ps->location, &x, &y);
+    sound_emit_at(SOUND_PLAYER_DEATH, x, y);
+
 
     switch (ps->location.type) {
-        case VEHICLE_LOCATION: 
+        case VEHICLE_LOCATION:
             remove_entity(ps->location.vehicle->entities, ps->id);
             break;
         case FIELD_LOCATION:
@@ -109,10 +116,10 @@ void move_player_to_location(player_state* player, location loc) {
     entity_t* ent;
 
     switch (player->location.type) {
-        case VOID_LOCATION: 
+        case VOID_LOCATION:
             ent = entity.of_player(player);
             break;
-        case FIELD_LOCATION: { 
+        case FIELD_LOCATION: {
             field_state* field = player->location.field;
             ent = get_entity_from_id(field->entities, player->id);
             update_events(ent, field->exit_events, (situation){ .type = MOVEMENT_SITUATION, .movement.loc = loc });
@@ -129,13 +136,13 @@ void move_player_to_location(player_state* player, location loc) {
 
     if (player->death_msg || ent == NULL) return;
 
-    
+
     location prev_loc = player->location;
 
     player->location = loc;
     switch (loc.type) {
-        case VOID_LOCATION: 
-            free(ent);    
+        case VOID_LOCATION:
+            free(ent);
             break;
         case FIELD_LOCATION: {
             field_state* field = location_field(loc);
@@ -155,10 +162,10 @@ void move_vehicle_to_location(vehicle_state* vehicle, location loc) {
     entity_t* ent;
 
     switch (vehicle->location.type) {
-        case VOID_LOCATION: 
+        case VOID_LOCATION:
             ent = entity.of_vehicle(vehicle);
             break;
-        case FIELD_LOCATION: { 
+        case FIELD_LOCATION: {
             field_state* field = vehicle->location.field;
             ent = get_entity_from_id(field->entities, vehicle->id);
             update_events(ent, field->exit_events, (situation){ .type = MOVEMENT_SITUATION, .movement.loc = loc });
@@ -171,13 +178,13 @@ void move_vehicle_to_location(vehicle_state* vehicle, location loc) {
         }
     }
 
-    if (vehicle->destroy || ent == NULL) return; 
+    if (vehicle->destroy || ent == NULL) return;
 
     location prev_loc = vehicle->location;
 
     vehicle->location = loc;
     switch (loc.type) {
-        case VOID_LOCATION: 
+        case VOID_LOCATION:
             free(ent);
             break;
         case FIELD_LOCATION: {
@@ -198,7 +205,7 @@ void move_entity_to_location(entity_t* e, location loc) {
     location curr = entity.get_location(e);
     switch (curr.type) {
         case VOID_LOCATION: break;
-        case FIELD_LOCATION: { 
+        case FIELD_LOCATION: {
             field_state* field = curr.field;
             update_events(e, field->exit_events, (situation){ .type = MOVEMENT_SITUATION, .movement.loc = loc });
             free(remove_entity(field->entities, entity.get_id(e)));
@@ -214,7 +221,7 @@ void move_entity_to_location(entity_t* e, location loc) {
         return;
 
     location prev_loc = entity.get_location(e);
-    
+
     entity.set_location(e, loc);
     switch (loc.type) {
         case VOID_LOCATION: break;

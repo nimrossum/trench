@@ -5,6 +5,7 @@
 #include "game_state.h"
 #include "fields.h"
 #include "resource_registry.h"
+#include "sound.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,12 +25,14 @@ int builtin_shoot(player_state* ps) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
     }
-    
+
+    sound_emit(SOUND_SHOOT);
+
     int x, y;
     location_coords(ps->location, &x, &y);
-    
+
     int limit = _gr->settings.shoot.range;
-    while (limit--) { 
+    while (limit--) {
         move_coord(&x, &y, d, 1);
         if (!in_bounds(x,y)) break;
 
@@ -42,6 +45,7 @@ int builtin_shoot(player_state* ps) {
 
         if (props & PROP_OBSTRUCTION) {
             fields.damage_field(field, KINETIC_DMG | PROJECTILE_DMG, "Got shot");
+            sound_emit_at(SOUND_HIT, x, y);
             ps->stack[ps->sp++] = INSTR_SUCCESS;
             return 1;
         }
@@ -50,6 +54,7 @@ int builtin_shoot(player_state* ps) {
                 entity_t* e = get_entity(field->entities, i);
                 if (e->type == ENTITY_PLAYER) {
                     death_mark_player(e->player, "Got shot");
+                    sound_emit_at(SOUND_HIT, x, y);
                     break;
                 }
             }
@@ -89,7 +94,7 @@ int builtin_scan(player_state* ps) {
 
     if (_gr->settings.scan.range >= 0 && p > _gr->settings.scan.range) { ps->stack[ps->sp++] = 0; return 0; }
     move_coord(&x, &y, d, p);
-    if (in_bounds(x, y)) {   
+    if (in_bounds(x, y)) {
         result = fields.properties(x,y);
     }
 
@@ -117,22 +122,22 @@ int builtin_mine(player_state* ps) {
     for(int i = 0; i < field->entities->count; i++) {
         entity_t* e = get_entity(field->entities, i);
         if (e->type == ENTITY_PLAYER) {
-            death_mark_player(e->player, "Hit by a thrown mine"); 
-            kill = 1; 
+            death_mark_player(e->player, "Hit by a thrown mine");
+            kill = 1;
         }
     }
 
     if (!kill) {
         set_overlay(field, MINE);
         set_color_overlay(field, FORE, WHITE);
-        
+
         field_args* args = malloc(sizeof(field_args));
         args->x = x;
         args->y = y;
         add_event(
             field->exit_events,
             PHYSICAL_EVENT,
-            events.mine, 
+            events.mine,
             args
         );
     }
@@ -140,7 +145,7 @@ int builtin_mine(player_state* ps) {
     return 1;
 }
 
-int builtin_move(player_state* ps) { 
+int builtin_move(player_state* ps) {
     direction d = (direction)ps->stack[--ps->sp];
 
     if (ps->location.type == VEHICLE_LOCATION) {
@@ -158,11 +163,11 @@ int builtin_move(player_state* ps) {
     move_coord(&x, &y, d, 1);
     if(!in_bounds(x,y)) {
         ps->stack[ps->sp++] = INSTR_OUT_OF_BOUNDS;
-        return 0; 
+        return 0;
     }
     if(fields.properties(x,y) & PROP_OBSTRUCTION) {
         ps->stack[ps->sp++] = INSTR_OBSTRUCTED;
-        return 0; 
+        return 0;
     }
 
     move_player_to_location(ps, field_location_from_coords(x,y));
@@ -178,7 +183,7 @@ int builtin_chop(player_state* ps) {
     move_coord(&x, &y, d, 1);
     if (!in_bounds(x,y)) {
         ps->stack[ps->sp++] = INSTR_OBSTRUCTED;
-        return 0; 
+        return 0;
     }
 
     field_state* field = fields.get(x,y);
@@ -196,6 +201,7 @@ int builtin_chop(player_state* ps) {
         add_resource(&ps->resources, R_Wood, _gr->settings.chop.wood_gain);
         int got_sapling = rand() % 100 < _gr->settings.chop.sapling_chance;
         if (got_sapling) add_resource(&ps->resources, R_Sapling, 1);
+        sound_emit_at(SOUND_TREE_CHOP, x, y);
     }
 
     ps->stack[ps->sp++] = INSTR_SUCCESS;
@@ -234,7 +240,7 @@ int builtin_fortify(player_state* ps) {
     if(!spend_resource(&ps->resources, R_Wood, _gr->settings.fortify.cost)) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
-    } 
+    }
 
     int x, y;
     p = clamp(p, _gr->settings.fortify.range, 0);
@@ -304,15 +310,15 @@ int builtin_projection(player_state* ps) {
     if (!spend_resource(&ps->resources, R_Mana, _gr->settings.projection.cost)) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
-    }  
- 
+    }
+
     if (
         !ps->is_original_player
         || ps->location.type == VEHICLE_LOCATION && !(get_vehicle_capacity(ps->location.vehicle->type) > ps->location.vehicle->entities->count)
     ) {
         ps->stack[ps->sp++] = INSTR_ERROR;
         return 0;
-    }  
+    }
 
     player_state* projection = copy_player_state(ps);
     copy_resource_registry(&ps->resources, &projection->resources);
@@ -439,7 +445,7 @@ int builtin_dispel(player_state* ps) {
     if(!spend_resource(&ps->resources, R_Mana, _gr->settings.dispel.cost)) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
-    } 
+    }
 
     int x, y;
     location_coords(ps->location, &x, &y);
@@ -524,7 +530,7 @@ int builtin_pager_read(player_state* ps) {
         return 0;
     }
 
-    if (ps->pager_msgs->count <= 0) 
+    if (ps->pager_msgs->count <= 0)
         ps->stack[ps->sp++] = INSTR_ERROR;
     else {
         int msg = (int)array_list.get(ps->pager_msgs, 0);
@@ -581,12 +587,12 @@ int builtin_wall(player_state* ps) {
 
 int builtin_plant_tree(player_state* ps) {
     direction d = (direction)ps->stack[--ps->sp];
-    
+
     if (!spend_resource(&ps->resources, R_Sapling, 1)) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
-    } 
-    
+    }
+
     int x, y;
     location_coords(ps->location, &x, &y);
     move_coord(&x, &y, d, 1);
@@ -608,7 +614,7 @@ int builtin_plant_tree(player_state* ps) {
 
 int builtin_bridge(player_state* ps) {
     direction d = (direction)ps->stack[--ps->sp];
-    
+
     if (!spend_resource(&ps->resources, R_Wood, _gr->settings.bridge.cost)) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
@@ -682,6 +688,8 @@ int builtin_collect(player_state* ps) {
             break;
     }
 
+    if (success) sound_emit_at(SOUND_POWER_UP, x, y);
+
     ps->stack[ps->sp++] = success;
     return change;
 }
@@ -705,13 +713,13 @@ int builtin_mount(player_state* ps) {
     if (!in_bounds(x,y)) {
         ps->stack[ps->sp++] = INSTR_OUT_OF_BOUNDS;
         return 0;
-    } 
+    }
     field_state* field = fields.get(x,y);
-    
+
     vehicle_state* vehicle = NULL;
     for(int i = 0; i < field->entities->count; i++) {
         entity_t* e = get_entity(field->entities, i);
-        if (e->type == ENTITY_VEHICLE) 
+        if (e->type == ENTITY_VEHICLE)
         vehicle = e->vehicle;
     }
     if (vehicle == NULL)  {
@@ -722,7 +730,7 @@ int builtin_mount(player_state* ps) {
     if (!(vehicle->entities->count < get_vehicle_capacity(vehicle->type))) {
         ps->stack[ps->sp++] = INSTR_INVALID_TARGET;
         return 0;
-    } 
+    }
 
     remove_entity(location_field(ps->location)->entities, ps->id);
     ps->location = vehicle_location(vehicle);
@@ -767,12 +775,12 @@ int builtin_dismount(player_state* ps) {
 
 int builtin_boat(player_state* ps) {
     int d = ps->stack[--ps->sp];
-    
+
     if (!spend_resource(&ps->resources, R_Wood, _gr->settings.boat.cost)) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
     }
-    
+
     int x, y;
     location_coords(ps->location, &x, &y);
     move_coord(&x, &y, d, 1);
@@ -786,7 +794,7 @@ int builtin_boat(player_state* ps) {
         return 0;
     }
 
-    
+
     vehicle_state* boat = malloc(sizeof(vehicle_state));
     boat->id = _gs->id_counter++;
     boat->entities = array_list.create(get_vehicle_capacity(VEHICLE_BOAT));
@@ -846,11 +854,11 @@ int builtin_throw_clay(player_state* ps) {
     }
 
     p = clamp(p, _gr->settings.throw_clay.range, 0);
-    
+
     int x, y;
     location_coords(ps->location, &x, &y);
-    
-    while (p--) { 
+
+    while (p--) {
         move_coord(&x, &y, d, 1);
         if (!in_bounds(x,y)) {
             ps->stack[ps->sp++] = INSTR_SUCCESS;
@@ -863,7 +871,7 @@ int builtin_throw_clay(player_state* ps) {
         set_overlay(field, FILLED_CIRCLE);
         set_color_overlay(field, FORE, CLAY_BROWN);
         print_board(); wait(0.02);
-        
+
         if (props & PROP_OBSTRUCTION) {
             fields.damage_field(field, KINETIC_DMG | PROJECTILE_DMG, "Got shot");
             ps->stack[ps->sp++] = INSTR_SUCCESS;
@@ -879,7 +887,7 @@ int builtin_throw_clay(player_state* ps) {
             }
             ps->stack[ps->sp++] = INSTR_SUCCESS;
             return 1;
-        }    
+        }
     }
 
     // clayify field
@@ -903,7 +911,7 @@ int builtin_clay_golem(player_state* ps) {
     if (!spend_resource(&ps->resources, R_Clay, _gr->settings.clay_golem.cost)) {
         ps->stack[ps->sp++] = INSTR_MISSING_RESOURCE;
         return 0;
-    }  
+    }
 
     if (
         !ps->is_original_player
@@ -911,7 +919,7 @@ int builtin_clay_golem(player_state* ps) {
     ) {
         ps->stack[ps->sp++] = INSTR_ERROR;
         return 0;
-    }  
+    }
 
     player_state* golem = copy_player_state(ps);
     golem->team = NULL;
@@ -1150,7 +1158,7 @@ int is_action(builtin_func func_addr) {
         case BUILTIN_CRAFT:
         case BUILTIN_COUNT:
             return 1;
-        default: 
+        default:
             return 0;
     }
 }

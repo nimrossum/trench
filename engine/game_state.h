@@ -9,6 +9,7 @@
 #include "resource_registry.h"
 #include "visual.h"
 #include "fields.h"
+#include "array_list.h"
 
 typedef struct directive_info {
     int dir_len;
@@ -34,6 +35,7 @@ typedef struct game_state {
     int team_count;
     event_list_t* events;
     team_state* team_states;
+    array_list_t* sound_events;
 } game_state;
 
 extern game_state* _gs;

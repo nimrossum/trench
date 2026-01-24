@@ -16,6 +16,7 @@
 #include "instructions.h"
 #include "entity.h"
 #include "log.h"
+#include "sound.h"
 
 void debug_print(player_state* ps) {
     fprintf(stderr,"\nPlayer %s(%i)\ninstr:%i\ndp:%i\nbp:%i\nsp:%i\n", ps->name, ps->id, ps->directive[ps->dp], ps->dp, ps->bp, ps->sp); wait(0.5);
@@ -43,7 +44,7 @@ void kill_players() {
 
 void remove_dead_players() {
     int count_alive = 0;
-    for(int i = 0; i < _gs->players->count; i++) 
+    for(int i = 0; i < _gs->players->count; i++)
         if (get_player(_gs->players, i)->alive) count_alive++;
 
     player_list_t* cleared_list = array_list.create(count_alive);
@@ -52,7 +53,7 @@ void remove_dead_players() {
         player_state* ps = get_player(_gs->players, i);
         if (ps->alive)
             array_list.add(cleared_list, ps);
-        else 
+        else
             free_player(ps);
     }
 
@@ -61,10 +62,10 @@ void remove_dead_players() {
 }
 
 int is_in_view(int x, int y) {
-    return 
-        (x >= _gr->viewport.x) && 
-        (x < _gr->viewport.x + _gr->viewport.width) && 
-        (y >= _gr->viewport.y) && 
+    return
+        (x >= _gr->viewport.x) &&
+        (x < _gr->viewport.x + _gr->viewport.width) &&
+        (y >= _gr->viewport.y) &&
         (y < _gr->viewport.y + _gr->viewport.height);
 }
 
@@ -102,7 +103,7 @@ void pan_viewport_player(float time, player_state* ps) {
 }
 
 void auto_viewport(int x, int y) {
-    if (_gr->viewport.automatic && !is_in_view(x,y)) 
+    if (_gr->viewport.automatic && !is_in_view(x,y))
         //center_viewport(x,y);
         pan_viewport(0.5, x, y);
 }
@@ -140,7 +141,7 @@ void player_turn_default(player_state* ps) {
                 ps->remaining_steps = 0;
                 break;
             }
-            case Instr_Random: instr_random_int(ps); break; 
+            case Instr_Random: instr_random_int(ps); break;
             case Instr_RandomSet: instr_random_range(ps); break;
             case Instr_Place: instr_place(ps); break;
             case Instr_Access: change = instr_access(ps); break;
@@ -170,10 +171,10 @@ void player_turn_default(player_state* ps) {
             default: return;
         }
 
-        if (change || _gs->feed_point) { 
+        if (change || _gs->feed_point) {
             auto_viewport_player(ps);
-            print_board(); 
-            wait(1); 
+            print_board();
+            wait(1);
         }
 
         kill_players();
@@ -194,14 +195,14 @@ void get_new_directive(player_state* ps) {
             array_list.remove(ps->extra_files, index, 0);
             if (strcmp("_", next) == 0) {
                 option = '0';
-            } 
+            }
             else {
                 option = '1';
                 free(ps->path);
                 ps->path = next;
             }
         }
-        else {   
+        else {
             printf("%s#%i, change directive?:\n0: No change\n1: Reload file\n2: New file\n", ps->name, ps->id);
 
             terminal_blocking_read_on();
@@ -249,7 +250,7 @@ void get_new_directive(player_state* ps) {
 
 void nuke_board() {
     for(int y = 0; y < _gs->board_y; y++)
-    for(int x = 0; x < _gs->board_x; x++) 
+    for(int x = 0; x < _gs->board_x; x++)
         fields.destroy_field(fields.get(x,y), "Got nuked");
 }
 
@@ -257,7 +258,7 @@ int teams_alive() {
     int alive = 0;
     for(int i = 0; i < _gs->team_count; i++) {
         if (_gs->team_states[i].members_alive) {
-            alive++; 
+            alive++;
             continue;
         }
     }
@@ -280,8 +281,9 @@ void check_win_condition() {
     switch (teams_alive()) {
         case 0:
             _log(INFO, "--- GAME END: Everyone is dead ---");
+            sound_emit(SOUND_WIN);
             _log_flush();
-            printf("GAME OVER: Everyone is dead...\n"); 
+            printf("GAME OVER: Everyone is dead...\n");
             terminal_echo_on();
             terminal_blocking_read_on();
             terminal_canonical_on();
@@ -290,8 +292,9 @@ void check_win_condition() {
             if (_gs->team_count == 1) break;
             else {
                 _log(INFO, "--- GAME END: %s won! ---", first_team_alive());
+                sound_emit(SOUND_WIN);
                 _log_flush();
-                printf("Team %s won!\n", first_team_alive()); 
+                printf("Team %s won!\n", first_team_alive());
                 terminal_echo_on();
                 terminal_blocking_read_on();
                 terminal_canonical_on();
@@ -316,7 +319,7 @@ void handle_input() {
             case '+':
                 _gr->time_scale += 0.1;
                 break;
-            case '-': 
+            case '-':
                 _gr->time_scale -= 0.1;
                 if (_gr->time_scale < 0.1) _gr->time_scale = 0.1;
                 break;
@@ -350,11 +353,11 @@ void handle_input() {
                 print_board();
                 break;
             }
-            case ' ': 
+            case ' ':
                 pause = !pause;
                 _gr->started = 1;
                 break;
-            case 'q': 
+            case 'q':
                 terminal_echo_on();
                 terminal_blocking_read_on();
                 terminal_canonical_on();
@@ -365,7 +368,7 @@ void handle_input() {
 }
 
 /*
-    Players complete their turn seperately one at a time. 
+    Players complete their turn seperately one at a time.
     Once each player has taken a turn, a round has passed.
 */
 void play_round_default() {
@@ -396,6 +399,7 @@ void play_round() {
             play_round_default();
             break;
     }
+    sound_flush();
     _log_flush();
     clear_screen();
 }
@@ -418,7 +422,7 @@ void dynamic_mode() {
             const int player_count = _gs->players->count;
             for (int i = 0; i < player_count; i++) {
                 player_state* player = get_player(_gs->players, i);
-                if (!player->alive) continue; 
+                if (!player->alive) continue;
                 if (player->is_original_player)
                     get_new_directive(player);
                 clear_screen();
@@ -462,7 +466,7 @@ int main(int argc, char** argv) {
     _gr = malloc(sizeof(game_rules));
     _gs = malloc(sizeof(game_state));
 
-    _log(INFO, "--- COMPILING ----"); 
+    _log(INFO, "--- COMPILING ----");
 
     if(!compile_game(argv[1], _gr, _gs)) return 1;
 
